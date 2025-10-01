@@ -1,4 +1,4 @@
-# android_dynamic_icon
+# android_dynamic_icon fork
 
 A flutter plugin for dynamically changing multiple android app icons for your app. Supports **only Android**.
 
