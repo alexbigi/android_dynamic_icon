@@ -1,33 +1,48 @@
-# Сохраняем все классы и методы плагина
+# Сохраняем все классы плагина
 -keep class com.example.android_dynamic_icon.** { *; }
 -dontwarn com.example.android_dynamic_icon.**
 
-# Сохраняем FlutterPlugin классы
--keep class * implements io.flutter.embedding.engine.plugins.FlutterPlugin
+# Сохраняем основной класс плагина для FlutterPlugin
+-keep class com.example.android_dynamic_icon.AndroidDynamicIconPlugin { *; }
 
-# Сохраняем методы, которые используются для регистрации плагинов
--keep class * {
-    boolean usesFlutterBinding;
+# Сохраняем реализацию вызовов методов
+-keep class com.example.android_dynamic_icon.MethodCallImplementation { *; }
+
+# Сохраняем FlutterPlugin интерфейс реализации
+-keep class * implements io.flutter.embedding.engine.plugins.FlutterPlugin {
+    public <init>();
 }
 
-# Сохраняем все public методы в классах плагина
--keepclassmembers class com.example.android_dynamic_icon.** {
+# Сохраняем MethodChannel вызовы
+-keep class * implements io.flutter.plugin.common.MethodChannel$MethodCallHandler {
+    public <init>();
+}
+
+# Сохраняем все методы в плагине
+-keepclassmembers class com.example.android_dynamic_icon.AndroidDynamicIconPlugin {
     public <methods>;
 }
 
-# Сохраняем методы, которые используются в MethodChannel
--keep class * implements io.flutter.plugin.common.MethodChannel$MethodCallHandler {
-    <methods>;
+# Сохраняем аннотации и сигнатуры
+-keepattributes Signature, InnerClasses, EnclosingMethod
+
+# Сохраняем все методы, которые могут быть вызваны нативно
+-keepclasseswithmembernames class * {
+    native <methods>;
 }
 
-# Сохраняем все конструкторы для плагинов
--keep public class * implements io.flutter.plugin.common.PluginRegistry$PluginRegistrantCallback
+# Сохраняем конструкторы FlutterPlugin
+-keep public class * {
+    public <init>(io.flutter.plugin.common.BinaryMessenger);
+}
 
-# Отключаем оптимизацию для плагинов
--keepattributes *Annotation*
--keep class io.flutter.plugins.** { *; }
--keep class * extends io.flutter.embedding.engine.FlutterEngine { *; }
+# Сохраняем FlutterEngine
+-keep class io.flutter.embedding.engine.FlutterEngine { *; }
 
-# Сохраняем конкретные классы плагина
--keep class com.example.android_dynamic_icon.AndroidDynamicIconPlugin { *; }
--keep class com.example.android_dynamic_icon.MethodCallImplementation { *; }
+# Сохраняем все классы, которые могут использоваться для регистрации плагинов
+-keep class * implements io.flutter.plugin.common.PluginRegistry$PluginRegistrantCallback
+
+# Сохраняем все классы с регистрацией
+-keep class * {
+    public static * registerWith(...);
+}

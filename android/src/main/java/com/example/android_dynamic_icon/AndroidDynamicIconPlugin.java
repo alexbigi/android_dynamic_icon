@@ -15,8 +15,10 @@ import io.flutter.embedding.engine.plugins.lifecycle.FlutterLifecycleAdapter;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.Log;
+import androidx.annotation.Keep;
 
 /** AndroidDynamicIconPlugin */
+@Keep
 public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
     private MethodChannel channel;
     private MethodCallImplementation handler;
