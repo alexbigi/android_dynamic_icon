@@ -73,29 +73,35 @@ public class MethodCallImplementation implements MethodCallHandler {
   }
 
   void updateIcon() {
-    if (iconChanged){
-        String className = args.get(0);
-        PackageManager pm = activity.getPackageManager();
-        String packageName = activity.getPackageName();
-        int componentState = PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
-        int i=0;
-        for(;i<classNames.size();i++) {
-            ComponentName cn = new ComponentName(packageName, packageName+"."+classNames.get(i));
-            if(className.equals(classNames.get(i))) {
-                componentState = PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
-            }
-            else{
-                componentState = PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
-            }
-            pm.setComponentEnabledSetting(cn, componentState, PackageManager.DONT_KILL_APP);
-        }
+    if (iconChanged && activity != null){
+        // Post the icon update to the main thread to avoid interfering with Flutter's rendering
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                String className = args.get(0);
+                PackageManager pm = activity.getPackageManager();
+                String packageName = activity.getPackageName();
+                int componentState = PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+                int i=0;
+                for(;i<classNames.size();i++) {
+                    ComponentName cn = new ComponentName(packageName, packageName+"."+classNames.get(i));
+                    if(className.equals(classNames.get(i))) {
+                        componentState = PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+                    }
+                    else{
+                        componentState = PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+                    }
+                    pm.setComponentEnabledSetting(cn, componentState, PackageManager.DONT_KILL_APP);
+                }
 
-        if(i>classNames.size()) {
-            Log.e(TAG,"class name "+className+" did not match in the initialized list.");
-            return;
-        }
-        iconChanged = false;
-        Log.d(TAG,"Icon switched to "+className);
+                if(i>=classNames.size()) {
+                    Log.e(TAG,"class name "+className+" did not match in the initialized list.");
+                    return;
+                }
+                iconChanged = false;
+                Log.d(TAG,"Icon switched to "+className);
+            }
+        });
      }
     }
 }
