@@ -151,8 +151,7 @@ public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
         @Override
         public void onPause(@NonNull LifecycleOwner owner) {
             Log.i("ChangeIcon", "The app has paused");
-            // Don't update icon on pause to prevent white screen issue
-            // Icon changes will be handled when the app resumes
+            handler.updateIcon();
         }
 
         @Override
@@ -170,8 +169,6 @@ public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
         @Override
         public void onActivityResumed(@NonNull Activity activity) {
             Log.i("ChangeIcon", "Activity has resumed");
-            // Update the icon when activity is fully resumed to ensure Flutter has proper context
-            handler.updateIcon();
         }
 
         @Override
