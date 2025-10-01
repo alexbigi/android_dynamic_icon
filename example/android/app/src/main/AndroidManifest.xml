@@ -25,6 +25,30 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+       <activity-alias
+           android:label="app"
+           android:icon="@drawable/iconone"
+           android:name=".IconOne"
+           android:enabled="false"
+           android:exported="true"
+           android:targetActivity=".MainActivity"> <!--target activity class path will be same for all alias-->
+           <intent-filter>
+               <action android:name="android.intent.action.MAIN" />
+               <category android:name="android.intent.category.LAUNCHER" />
+           </intent-filter>
+       </activity-alias>
+       <activity-alias
+           android:label="app"
+           android:icon="@drawable/icontwo"
+           android:name=".IconTwo"
+           android:enabled="false"
+           android:exported="true"
+           android:targetActivity=".MainActivity"> <!--target activity class path will be same for all alias-->
+           <intent-filter>
+               <action android:name="android.intent.action.MAIN" />
+               <category android:name="android.intent.category.LAUNCHER" />
+           </intent-filter>
+       </activity-alias>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

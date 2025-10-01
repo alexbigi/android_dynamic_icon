@@ -18,7 +18,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     AndroidDynamicIcon.initialize(
-        classNames: ['MainActivity', 'ExampleIconActivity']);
+        classNames: ['MainActivity', 'IconOne', 'IconTwo']);
     super.initState();
   }
 
@@ -29,17 +29,39 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text('Plugin example app'),
         ),
-        body: GestureDetector(
-          onTap: () async {
-            await _androidDynamicIconPlugin
-                .changeIcon(classNames: ['ExampleActivity', '']);
-            // To change icon back to default one.
-            // await _androidDynamicIconPlugin
-            //     .changeIcon(classNames: ['MainActivity', '']);
-          },
-          child: const Center(
-            child: Text('Change Icon'),
-          ),
+        body: Column(
+          children: [
+            TextButton(
+              onPressed: () async {
+                //To set Icon One
+                await _androidDynamicIconPlugin
+                    .changeIcon(classNames: ['IconOne', '']);
+              },
+              child: const Center(
+                child: Text('Change Icon 1'),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                // //To set Icon Two
+                await _androidDynamicIconPlugin
+                    .changeIcon(classNames: ['IconTwo', '']);
+              },
+              child: const Center(
+                child: Text('Change Icon 2'),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                // //To set Default Icon
+                await _androidDynamicIconPlugin
+                    .changeIcon(classNames: ['MainActivity', '']);
+              },
+              child: const Center(
+                child: Text('Change to default'),
+              ),
+            ),
+          ],
         ),
       ),
     );
