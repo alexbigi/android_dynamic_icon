@@ -94,15 +94,15 @@ class _MyAppState extends State<MyApp> {
     
     // Планируем смену иконки через 15 секунд после запуска
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Using the traditional method
-      _androidDynamicIconPlugin.scheduleIconChange(
-        seconds: 15,
-        targetIcon: 'IconOne'
-      );
-      
+      // // Using the traditional method
+      // _androidDynamicIconPlugin.scheduleIconChange(
+      //   seconds: 15,
+      //   targetIcon: 'IconOne'
+      // );
+      //
       // Using the new exact alarm method - IconTwo after 20 seconds
       _androidDynamicIconPlugin.scheduleIconChangeWithExactAlarm(
-        seconds: 20,
+        seconds: 10,
         targetIcon: 'IconTwo'
       );
       

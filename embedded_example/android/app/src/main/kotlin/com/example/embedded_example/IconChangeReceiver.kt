@@ -15,14 +15,18 @@ import android.content.Context.ACTIVITY_SERVICE
 class IconChangeReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "[IconChangeReceiver]"
-        const val ACTION_ICON_CHANGE = "com.example.embedded_example.ICON_CHANGE"
+        private const val ACTION_SUFFIX = ".ICON_CHANGE"
         const val EXTRA_TARGET_ICON = "target_icon"
         const val EXTRA_SCHEDULE_TIME = "schedule_time"
+        
+        fun getActionName(context: Context): String {
+            return context.packageName + ACTION_SUFFIX
+        }
     }
     
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            ACTION_ICON_CHANGE -> {
+            getActionName(context) -> {
                 val targetIcon = intent.getStringExtra(EXTRA_TARGET_ICON)
                 val scheduleTime = intent.getLongExtra(EXTRA_SCHEDULE_TIME, 0)
                 
@@ -57,7 +61,7 @@ class IconChangeReceiver : BroadcastReceiver() {
                                 try {
                                     Thread.sleep(2000) // Wait 2 seconds
                                     val stopIntent = Intent(context, IconChangeService::class.java).apply {
-                                        action = "com.example.embedded_example.STOP_ICON_CHANGE_SERVICE"
+                                        action = context.packageName + ".STOP_ICON_CHANGE_SERVICE"
                                     }
                                     context.stopService(stopIntent)
                                 } catch (e: Exception) {

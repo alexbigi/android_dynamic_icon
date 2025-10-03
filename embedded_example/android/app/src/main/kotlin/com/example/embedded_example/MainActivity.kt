@@ -196,7 +196,7 @@ class MainActivity: FlutterActivity() {
             
             // Запускаем сервис для смены иконки
             val serviceIntent = Intent(this, IconChangeService::class.java).apply {
-                action = "com.example.embedded_example.START_ICON_CHANGE_SERVICE"
+                action = IconChangeService.getActionStart(this@MainActivity)
                 putExtra(IconChangeService.EXTRA_TARGET_ICON, targetIcon)
                 putExtra(IconChangeService.EXTRA_SCHEDULE_TIME, scheduleTime)
             }
@@ -230,7 +230,7 @@ class MainActivity: FlutterActivity() {
             }
             
             val serviceIntent = Intent(this, IconChangeService::class.java).apply {
-                action = "com.example.embedded_example.START_ICON_CHANGE_SERVICE"
+                action = IconChangeService.getActionStart(this@MainActivity)
                 putExtra(IconChangeService.EXTRA_TARGET_ICON, targetIcon)
                 putExtra(IconChangeService.EXTRA_SCHEDULE_TIME, scheduleTime)
             }
@@ -244,7 +244,7 @@ class MainActivity: FlutterActivity() {
     
     private fun stopIconChangeService() {
         val serviceIntent = Intent(this, IconChangeService::class.java).apply {
-            action = "com.example.embedded_example.STOP_ICON_CHANGE_SERVICE"
+            action = IconChangeService.getActionStop(this@MainActivity)
         }
         stopService(serviceIntent)
         Log.d("[android_dynamic_icon]", "Stopped IconChangeService")

@@ -19,17 +19,25 @@ class IconChangeService : Service() {
         private const val TAG = "[IconChangeService]"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "IconChangeChannel"
-        private const val ACTION_START = "com.example.embedded_example.START_ICON_CHANGE_SERVICE"
-        private const val ACTION_STOP = "com.example.embedded_example.STOP_ICON_CHANGE_SERVICE"
-        private const val ACTION_SCHEDULE_ICON_CHANGE = "com.example.embedded_example.SCHEDULE_ICON_CHANGE"
+        private const val ACTION_START_SUFFIX = ".START_ICON_CHANGE_SERVICE"
+        private const val ACTION_STOP_SUFFIX = ".STOP_ICON_CHANGE_SERVICE"
+        private const val ACTION_SCHEDULE_ICON_CHANGE_SUFFIX = ".SCHEDULE_ICON_CHANGE"
         
         // Extra keys for intent extras
         const val EXTRA_TARGET_ICON = "target_icon"
         const val EXTRA_SCHEDULE_TIME = "schedule_time"
         
+        fun getActionStart(context: Context): String {
+            return context.packageName + ACTION_START_SUFFIX
+        }
+        
+        fun getActionStop(context: Context): String {
+            return context.packageName + ACTION_STOP_SUFFIX
+        }
+        
         fun createStartIntent(context: Context, targetIcon: String, scheduleTime: Long): Intent {
             return Intent(context, IconChangeService::class.java).apply {
-                action = ACTION_START
+                action = getActionStart(context)
                 putExtra(EXTRA_TARGET_ICON, targetIcon)
                 putExtra(EXTRA_SCHEDULE_TIME, scheduleTime)
             }
@@ -37,7 +45,7 @@ class IconChangeService : Service() {
         
         fun createStopIntent(context: Context): Intent {
             return Intent(context, IconChangeService::class.java).apply {
-                action = ACTION_STOP
+                action = getActionStop(context)
             }
         }
     }
@@ -56,7 +64,7 @@ class IconChangeService : Service() {
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> {
+            getActionStart(this) -> {
                 val targetIcon = intent.getStringExtra(EXTRA_TARGET_ICON)
                 val scheduleTime = intent.getLongExtra(EXTRA_SCHEDULE_TIME, 0)
                 
@@ -64,7 +72,7 @@ class IconChangeService : Service() {
                     scheduleIconChange(targetIcon, scheduleTime)
                 }
             }
-            ACTION_STOP -> {
+            getActionStop(this) -> {
                 stopSelf()
             }
         }
@@ -108,7 +116,7 @@ class IconChangeService : Service() {
     private fun scheduleIconChange(targetIcon: String, scheduleTime: Long) {
         try {
             val intent = Intent(this, IconChangeReceiver::class.java).apply {
-                action = IconChangeReceiver.ACTION_ICON_CHANGE
+                action = IconChangeReceiver.getActionName(this@IconChangeService)
                 putExtra(IconChangeReceiver.EXTRA_TARGET_ICON, targetIcon)
                 putExtra(IconChangeReceiver.EXTRA_SCHEDULE_TIME, scheduleTime)
             }
@@ -155,7 +163,7 @@ class IconChangeService : Service() {
      */
     fun cancelScheduledIconChange(targetIcon: String) {
         val intent = Intent(this, IconChangeReceiver::class.java).apply {
-            action = IconChangeReceiver.ACTION_ICON_CHANGE
+            action = IconChangeReceiver.getActionName(this@IconChangeService)
             putExtra(IconChangeReceiver.EXTRA_TARGET_ICON, targetIcon)
         }
         
