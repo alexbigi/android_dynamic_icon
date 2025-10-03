@@ -75,6 +75,59 @@ class AndroidDynamicIcon {
       'targetIcon': targetIcon
     });
   }
+  
+  // Метод для периодической проверки праздников и автосмены иконки (новый)
+  Future<void> scheduleHolidayCheck({
+    required int intervalSeconds,
+    required String defaultIcon,
+    required List<Holiday> holidays,
+  }) async {
+    final List<Map<String, dynamic>> holidaysData = holidays.map((holiday) => {
+      'iconAlias': holiday.iconAlias,
+      'startDate': holiday.startDate,
+      'endDate': holiday.endDate,
+      'name': holiday.name,
+    }).toList();
+    
+    await _channel.invokeMethod('schedulePeriodicCheck', {
+      'intervalSeconds': intervalSeconds,
+      'defaultIcon': defaultIcon,
+      'holidays': holidaysData,
+    });
+  }
+  
+  // Метод для запуска автономного сервиса смены иконок
+  Future<void> startAutonomousIconChange({
+    required String defaultIcon,
+    required List<Holiday> holidays,
+  }) async {
+    final List<Map<String, dynamic>> holidaysData = holidays.map((holiday) => {
+      'iconAlias': holiday.iconAlias,
+      'startDate': holiday.startDate,
+      'endDate': holiday.endDate,
+      'name': holiday.name,
+    }).toList();
+    
+    await _channel.invokeMethod('startAutonomousIconChange', {
+      'defaultIcon': defaultIcon,
+      'holidays': holidaysData,
+    });
+  }
+}
+
+// Класс для описания праздника
+class Holiday {
+  final String iconAlias;
+  final String startDate;
+  final String? endDate;
+  final String name;
+
+  Holiday({
+    required this.iconAlias,
+    required this.startDate,
+    this.endDate,
+    required this.name,
+  });
 }
 
 class MyApp extends StatefulWidget {
@@ -100,21 +153,30 @@ class _MyAppState extends State<MyApp> {
       //   targetIcon: 'IconOne'
       // );
       //
-      // Using the new exact alarm method - IconTwo after 20 seconds
-      _androidDynamicIconPlugin.scheduleIconChangeWithExactAlarm(
-        seconds: 10,
-        targetIcon: 'IconTwo'
-      );
-      
-      // Планируем периодическую проверку каждые 15 минут
-      _androidDynamicIconPlugin.schedulePeriodicCheck(
-        intervalSeconds: 15 * 60, // 15 минут
-        targetIcon: 'IconTwo',
-        conditions: {
-          'date': '04.10.2025', // Пример условия - конкретная дата
-          'dateRangeStart': '30.12.2025', // Пример условия - диапазон дат (начало)
-          'dateRangeEnd': '05.01.2026', // Пример условия - диапазон дат (конец)
-        }
+      // // Using the new exact alarm method - IconTwo after 20 seconds
+      // _androidDynamicIconPlugin.scheduleIconChangeWithExactAlarm(
+      //   seconds: 20,
+      //   targetIcon: 'IconTwo'
+      // );
+      //
+      // Планируем ПРАЗДНИЧНУЮ проверку - 8 марта иконка IconOne, Новый год IconTwo, остальное MainActivity
+      _androidDynamicIconPlugin.scheduleHolidayCheck(
+        intervalSeconds: 10, // проверка каждую минуту для демонстрации
+        defaultIcon: 'MainActivity',
+        holidays: [
+          Holiday(
+            iconAlias: 'IconOne',
+            startDate: '31.10.2025',
+            endDate: '31.10.2025',
+            name: 'Halloween',
+          ),
+          Holiday(
+            iconAlias: 'IconTwo',
+            startDate: '31.12.2025', // начало новогодних праздников
+            endDate: '10.01.2026',  // конец новогодних праздников
+            name: 'Новогодние праздники',
+          ),
+        ],
       );
     });
     

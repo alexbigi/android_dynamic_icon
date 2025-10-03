@@ -1,10 +1,12 @@
 package com.example.embedded_example
 
 import android.app.Application
+import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import java.text.SimpleDateFormat
+import androidx.core.content.ContextCompat
 import java.util.*
 
 /**
@@ -15,7 +17,6 @@ class DeferredIconChangeManager(private val application: Application) {
     companion object {
         private const val TAG = "[DeferredIconChangeManager]"
         private const val ICON_CHANGE_DELAY_MS = 1000L // 1 секунда задержки перед сменой
-        private val DATE_FORMAT = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     }
 
     private val iconManager = IconManager(application)
@@ -25,6 +26,8 @@ class DeferredIconChangeManager(private val application: Application) {
     private var scheduledDelaySeconds: Int = 15 // Запланированная задержка в секундах
     private var scheduledIconChangeRunnable: Runnable? = null // Задача для смены иконки по дедлайну
     private var periodicCheckRunnable: Runnable? = null
+    private var periodicCheckHolidays: List<Holiday> = emptyList()
+    private var periodicCheckDefaultIcon: String = "MainActivity"
     private var periodicCheckConditions: Map<*, *> = emptyMap<String, Any>()
     private var periodicCheckTargetIcon: String = "MainActivity"
     private var isAppInBackground = false
@@ -68,6 +71,57 @@ class DeferredIconChangeManager(private val application: Application) {
      * @param intervalSeconds интервал проверки в секундах
      * @param conditions условия для смены иконки
      */
+    /**
+     * Запланировать периодическую проверку дат для смены иконки (новый метод)
+     * @param holidays список праздников с иконками
+     * @param defaultIcon иконка по умолчанию
+     * @param intervalSeconds интервал проверки в секундах
+     */
+    fun schedulePeriodicCheck(
+        holidays: List<Holiday>,
+        defaultIcon: String,
+        intervalSeconds: Int
+    ) {
+        if (!IconConfig.isIconAvailable(defaultIcon)) {
+            Log.e(TAG, "Cannot schedule periodic check: default icon '$defaultIcon' is not available")
+            return
+        }
+        
+        // Проверяем, что все иконки в праздниках доступны
+        for (holiday in holidays) {
+            if (!IconConfig.isIconAvailable(holiday.iconAlias)) {
+                Log.e(TAG, "Cannot schedule periodic check: icon '${holiday.iconAlias}' is not available")
+                return
+            }
+        }
+        
+        // Отменяем предыдущую периодическую проверку
+        cancelPeriodicCheck()
+        
+        periodicCheckHolidays = holidays
+        periodicCheckDefaultIcon = defaultIcon
+        
+        // Запускаем периодическую проверку
+        periodicCheckRunnable = object : Runnable {
+            override fun run() {
+                checkHolidaysAndChangeIcon()
+                // Планируем следующую проверку
+                handler.postDelayed(this, intervalSeconds * 1000L)
+            }
+        }
+        
+        // Запускаем первую проверку немедленно
+        handler.post(periodicCheckRunnable!!)
+        
+        Log.d(TAG, "Scheduled periodic check every $intervalSeconds seconds for ${holidays.size} holidays, default icon: $defaultIcon")
+    }
+    
+    /** 
+     * Запланировать периодическую проверку условий (старый метод для обратной совместимости)
+     * @param targetIconAlias имя целевой иконки
+     * @param intervalSeconds интервал проверки в секундах
+     * @param conditions условия для смены иконки
+     */
     fun schedulePeriodicCheck(
         targetIconAlias: String,
         intervalSeconds: Int,
@@ -96,7 +150,7 @@ class DeferredIconChangeManager(private val application: Application) {
         // Запускаем первую проверку немедленно
         handler.post(periodicCheckRunnable!!)
         
-        Log.d(TAG, "Scheduled periodic check every $intervalSeconds seconds for icon $targetIconAlias")
+        Log.d(TAG, "Scheduled periodic check (legacy) every $intervalSeconds seconds for icon $targetIconAlias")
     }
 
     /** 
@@ -144,6 +198,106 @@ class DeferredIconChangeManager(private val application: Application) {
     }
 
     /**
+     * Проверить даты праздников и при необходимости сменить иконку
+     */
+    private fun checkHolidaysAndChangeIcon() {
+        try {
+            val currentDate = Date()
+            var targetIcon: String? = null
+            
+            // Проверяем, попадает ли текущая дата под какой-либо праздник
+            for (holiday in periodicCheckHolidays) {
+                if (holiday.isCurrentDayMonthInRange(currentDate)) {
+                    targetIcon = holiday.iconAlias
+                    Log.d(TAG, "Holiday matched: ${holiday.name}, icon: $targetIcon, date: ${DateUtils.DATE_FORMAT.format(currentDate)}")
+                    break // Используем первую подходящую иконку
+                }
+            }
+            
+            // Если ни один праздник не подошел, используем иконку по умолчанию
+            if (targetIcon == null) {
+                targetIcon = periodicCheckDefaultIcon
+                Log.d(TAG, "No holiday matched, using default icon: $targetIcon")
+            }
+            
+            // Проверяем, отличается ли текущая иконка от целевой
+            val currentIcon = iconManager.getCurrentActiveIcon()
+            if (currentIcon != targetIcon) {
+                Log.d(TAG, "Current icon ($currentIcon) differs from target icon ($targetIcon) - scheduling change via service")
+                
+                // Используем сервис для надежной смены иконки, как в scheduleIconChangeWithExactAlarm
+                val context = application.applicationContext
+                val scheduleTime = System.currentTimeMillis() + 1000L // Запланировать на 1 секунду в будущем
+                
+                val serviceIntent = Intent(context, IconChangeService::class.java).apply {
+                    action = IconChangeService.getActionStart(context)
+                    putExtra(IconChangeService.EXTRA_TARGET_ICON, targetIcon)
+                    putExtra(IconChangeService.EXTRA_SCHEDULE_TIME, scheduleTime)
+                }
+                
+                ContextCompat.startForegroundService(context, serviceIntent)
+                Log.d(TAG, "Scheduled holiday icon change to $targetIcon via service at ${Date(scheduleTime)}")
+            } else {
+                Log.d(TAG, "Current icon is already $targetIcon, no change needed")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking holidays and changing icon: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Конвертировать старый формат условий в список праздников (для обратной совместимости)
+     */
+    private fun convertConditionsToHolidays(targetIconAlias: String, conditions: Map<*, *>): List<Holiday> {
+        val holidays = mutableListOf<Holiday>()
+        
+        try {
+            val dateCondition = conditions["date"] as? String
+            val dateRangeStart = conditions["dateRangeStart"] as? String
+            val dateRangeEnd = conditions["dateRangeEnd"] as? String
+            
+            // Проверка конкретной даты
+            if (dateCondition != null) {
+                try {
+                    val date = DateUtils.DATE_FORMAT.parse(dateCondition)
+                    if (date != null) {
+                        holidays.add(Holiday(
+                            iconAlias = targetIconAlias,
+                            startDate = date,
+                            endDate = null,
+                            name = "Single Date Holiday"
+                        ))
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing single date: ${e.message}")
+                }
+            }
+            
+            // Проверка диапазона дат
+            if (dateRangeStart != null && dateRangeEnd != null) {
+                try {
+                    val startDate = DateUtils.DATE_FORMAT.parse(dateRangeStart)
+                    val endDate = DateUtils.DATE_FORMAT.parse(dateRangeEnd)
+                    if (startDate != null && endDate != null) {
+                        holidays.add(Holiday(
+                            iconAlias = targetIconAlias,
+                            startDate = startDate,
+                            endDate = endDate,
+                            name = "Date Range Holiday"
+                        ))
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing date range: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error converting conditions to holidays: ${e.message}", e)
+        }
+        
+        return holidays
+    }
+
+    /**
      * Выполнить отложенную смену иконки, если таковая имеется
      */
     fun executePendingIconChangeIfAny() {
@@ -161,6 +315,22 @@ class DeferredIconChangeManager(private val application: Application) {
                     }
                 }, 500) // Небольшая задержка для корректной обработки
             }
+        }
+    }
+    
+    /**
+     * Проверить изменение времени и при необходимости обновить иконку
+     */
+    fun checkTimeChangeAndIcon() {
+        Log.d(TAG, "Checking time change and updating icon if needed")
+        
+        // Проверяем, запущен ли автономный сервис и есть ли у него конфигурация
+        val service = application.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+        // Для проверки времени используем текущую логику проверки праздников
+        
+        // Имитируем проверку праздников, как в автономном сервисе
+        if (periodicCheckHolidays.isNotEmpty()) {
+            checkHolidaysAndChangeIcon()
         }
     }
 
@@ -229,7 +399,7 @@ class DeferredIconChangeManager(private val application: Application) {
     private fun checkConditionsAndChangeIcon() {
         try {
             val currentDate = Date()
-            val currentDateStr = DATE_FORMAT.format(currentDate)
+            val currentDateStr = DateUtils.DATE_FORMAT.format(currentDate)
             
             // Проверяем условия
             val dateCondition = periodicCheckConditions["date"] as? String
@@ -247,8 +417,8 @@ class DeferredIconChangeManager(private val application: Application) {
             // Проверка диапазона дат
             if (dateRangeStart != null && dateRangeEnd != null) {
                 try {
-                    val startDate = DATE_FORMAT.parse(dateRangeStart)
-                    val endDate = DATE_FORMAT.parse(dateRangeEnd)
+                    val startDate = DateUtils.DATE_FORMAT.parse(dateRangeStart)
+                    val endDate = DateUtils.DATE_FORMAT.parse(dateRangeEnd)
                     if (startDate != null && endDate != null && 
                         currentDate.time >= startDate.time && 
                         currentDate.time <= endDate.time) {

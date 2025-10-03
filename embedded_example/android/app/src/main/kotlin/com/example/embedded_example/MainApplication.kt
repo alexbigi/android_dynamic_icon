@@ -11,10 +11,13 @@ class MainApplication : Application() {
     }
     
     private var deferredIconChangeManager: DeferredIconChangeManager? = null
+    private lateinit var configManager: IconChangeConfigManager
     
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "MainApplication created")
+        
+        configManager = IconChangeConfigManager(this)
         
         // Инициализируем менеджер отложенной смены иконки
         deferredIconChangeManager = DeferredIconChangeManager(this)
@@ -27,7 +30,25 @@ class MainApplication : Application() {
         return deferredIconChangeManager
     }
     
+    fun getConfigManager(): IconChangeConfigManager {
+        return configManager
+    }
+    
     /**
+     * Получить сохраненную автономную конфигурацию (для совместимости)
+     */
+    fun getAutonomousConfig(): IconChangeConfig? {
+        return configManager.loadConfig()
+    }
+    
+    /**
+     * Сохранить автономную конфигурацию (для совместимости)
+     */
+    fun saveAutonomousConfig(config: IconChangeConfig) {
+        configManager.saveConfig(config)
+    }
+    
+    /** 
      * Трекер жизненного цикла активностей для отслеживания сворачивания/разворачивания приложения
      */
     private inner class AppLifecycleTracker : ActivityLifecycleCallbacks {
@@ -54,10 +75,6 @@ class MainApplication : Application() {
                 // Приложение ушло в фоновый режим
                 deferredIconChangeManager?.onAppBackgrounded()
                 Log.d(TAG, "App moved to background")
-                
-                // Проверить, есть ли запланированные изменения иконки от системных компонентов
-                // и выполнить их, если они есть
-                deferredIconChangeManager?.executePendingIconChangeIfAny()
             }
         }
         

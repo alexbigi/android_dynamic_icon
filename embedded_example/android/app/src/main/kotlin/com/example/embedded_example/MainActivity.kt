@@ -19,6 +19,9 @@ class MainActivity: FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Проверить дату при запуске приложения (для обновления иконки при смене даты вручную)
+        checkDateAndIconOnAppStart()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -51,6 +54,11 @@ class MainActivity: FlutterActivity() {
                 "schedulePeriodicCheck" -> {
                     // Планирование периодической проверки условий
                     schedulePeriodicCheck(call)
+                    result.success(null)
+                }
+                "startAutonomousIconChange" -> {
+                    // Запуск автономного сервиса смены иконок
+                    startAutonomousIconChange(call)
                     result.success(null)
                 }
                 "scheduleIconChangeWithExactAlarm" -> {
@@ -90,6 +98,29 @@ class MainActivity: FlutterActivity() {
         Log.i("ChangeIcon", "The app has paused")
         // Сообщаем менеджеру, что приложение ушло в фон
         (application as? MainApplication)?.getDeferredIconChangeManager()?.onAppBackgrounded()
+    }
+    
+    private fun startAutonomousIconChange(call: MethodCall) {
+        try {
+            val arguments = call.arguments as? Map<*, *>
+            val defaultIcon = arguments?.get("defaultIcon") as? String ?: "MainActivity"
+            val holidaysList = arguments?.get("holidays") as? List<Map<*, *>> ?: emptyList()
+            
+            // Конвертируем список праздников
+            val holidays = convertHolidayMapsToHolidayObjects(holidaysList)
+            val config = IconChangeConfig(holidays, defaultIcon)
+            
+            // Запускаем автономный сервис 
+            val serviceIntent = Intent(this, IconChangeService::class.java).apply {
+                action = IconChangeService.getActionScheduleHolidayConfig(this@MainActivity)
+                putExtra(IconChangeService.EXTRA_CONFIG_JSON, IconChangeService.serializeConfig(config))
+            }
+            
+            ContextCompat.startForegroundService(this, serviceIntent)
+            Log.d("[android_dynamic_icon]", "Started autonomous icon change service with ${holidays.size} holidays, default: $defaultIcon")
+        } catch (e: Exception) {
+            Log.e("[android_dynamic_icon]", "Error starting autonomous icon change service: ${e.message}", e)
+        }
     }
     
     private fun changeIconDeferred(call: MethodCall) {
@@ -162,16 +193,60 @@ class MainActivity: FlutterActivity() {
             
             val intervalSeconds = arguments["intervalSeconds"] as? Int ?: 15 * 60
             val targetIcon = arguments["targetIcon"] as? String ?: "MainActivity"
-            val conditions = arguments["conditions"] as? Map<*, *> ?: emptyMap<String, Any>()
+            val defaultIcon = arguments["defaultIcon"] as? String ?: "MainActivity"
+            val holidaysList = arguments["holidays"] as? List<Map<*, *>> ?: emptyList()
             
-            // Планируем периодическую проверку условий
-            val deferredManager = (application as? MainApplication)?.getDeferredIconChangeManager()
-            deferredManager?.schedulePeriodicCheck(targetIcon, intervalSeconds, conditions)
-            
-            Log.d("[android_dynamic_icon]", "Scheduled periodic check every $intervalSeconds seconds for icon $targetIcon")
+            if (holidaysList.isNotEmpty()) {
+                // Используем новый формат с праздниками
+                val holidays = convertHolidayMapsToHolidayObjects(holidaysList)
+                val deferredManager = (application as? MainApplication)?.getDeferredIconChangeManager()
+                deferredManager?.schedulePeriodicCheck(holidays, defaultIcon, intervalSeconds)
+                
+                Log.d("[android_dynamic_icon]", "Scheduled periodic check with ${holidays.size} holidays, default icon: $defaultIcon, interval: $intervalSeconds seconds")
+            } else {
+                // Используем старый формат для обратной совместимости
+                val conditions = arguments["conditions"] as? Map<*, *> ?: emptyMap<String, Any>()
+                
+                val deferredManager = (application as? MainApplication)?.getDeferredIconChangeManager()
+                deferredManager?.schedulePeriodicCheck(targetIcon, intervalSeconds, conditions)
+                
+                Log.d("[android_dynamic_icon]", "Scheduled periodic check (legacy format) every $intervalSeconds seconds for icon $targetIcon")
+            }
         } catch (e: Exception) {
-            Log.e("[android_dynamic_icon]", "Error scheduling periodic check: ${e.message}")
+            Log.e("[android_dynamic_icon]", "Error scheduling periodic check: ${e.message}", e)
         }
+    }
+    
+    /**
+     * Конвертировать список Map в список Holiday объектов
+     */
+    private fun convertHolidayMapsToHolidayObjects(holidaysList: List<Map<*, *>>): List<Holiday> {
+        val holidays = mutableListOf<Holiday>()
+        
+        for (holidayMap in holidaysList) {
+            try {
+                val iconAlias = holidayMap["iconAlias"] as? String ?: continue
+                val startDateStr = holidayMap["startDate"] as? String ?: continue
+                val endDateStr = holidayMap["endDate"] as? String
+                val name = holidayMap["name"] as? String ?: ""
+                
+                val startDate = DateUtils.parseDate(startDateStr)
+                val endDate = if (endDateStr != null) DateUtils.parseDate(endDateStr) else null
+                
+                if (startDate != null) {
+                    holidays.add(Holiday(
+                        iconAlias = iconAlias,
+                        startDate = startDate,
+                        endDate = endDate,
+                        name = name
+                    ))
+                }
+            } catch (e: Exception) {
+                Log.e("[android_dynamic_icon]", "Error parsing holiday data: ${e.message}", e)
+            }
+        }
+        
+        return holidays
     }
     
     private fun scheduleIconChangeWithExactAlarm(call: MethodCall) {
@@ -263,5 +338,24 @@ class MainActivity: FlutterActivity() {
         } catch (e: Exception) {
             Log.e("[android_dynamic_icon]", "Error cancelling scheduled icon change: ${e.message}", e)
         }
+    }
+    
+    /**
+     * Проверить дату и при необходимости обновить иконку при запуске приложения
+     */
+    private fun checkDateAndIconOnAppStart() {
+        Thread {
+            try {
+                val app = applicationContext as? MainApplication
+                val config = app?.getConfigManager()?.loadConfig()
+                
+                if (config != null) {
+                    IconChangeHelper.checkDateAndChangeIcon(this, config)
+                    Log.d("[android_dynamic_icon]", "Date check completed on app start")
+                }
+            } catch (e: Exception) {
+                Log.e("[android_dynamic_icon]", "Error checking date on app start: ${e.message}", e)
+            }
+        }.start()
     }
 }
