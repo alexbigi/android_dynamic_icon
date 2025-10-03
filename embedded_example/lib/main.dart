@@ -41,6 +41,40 @@ class AndroidDynamicIcon {
       'conditions': conditions ?? {}
     });
   }
+  
+  // Метод для планирования смены иконки с использованием Foreground Service и Exact Alarms
+  Future<void> scheduleIconChangeWithExactAlarm({
+    required int seconds,
+    required String targetIcon
+  }) async {
+    await _channel.invokeMethod('scheduleIconChangeWithExactAlarm', {
+      'seconds': seconds,
+      'targetIcon': targetIcon
+    });
+  }
+  
+  // Метод для запуска сервиса смены иконки
+  Future<void> startIconChangeService({
+    required String targetIcon,
+    int? scheduleTime
+  }) async {
+    await _channel.invokeMethod('startIconChangeService', {
+      'targetIcon': targetIcon,
+      'scheduleTime': scheduleTime
+    });
+  }
+  
+  // Метод для остановки сервиса смены иконки
+  Future<void> stopIconChangeService() async {
+    await _channel.invokeMethod('stopIconChangeService');
+  }
+  
+  // Метод для отмены запланированной смены иконки
+  Future<void> cancelScheduledIconChange({required String targetIcon}) async {
+    await _channel.invokeMethod('cancelScheduledIconChange', {
+      'targetIcon': targetIcon
+    });
+  }
 }
 
 class MyApp extends StatefulWidget {
@@ -60,9 +94,16 @@ class _MyAppState extends State<MyApp> {
     
     // Планируем смену иконки через 15 секунд после запуска
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Using the traditional method
       _androidDynamicIconPlugin.scheduleIconChange(
         seconds: 15,
         targetIcon: 'IconOne'
+      );
+      
+      // Using the new exact alarm method - IconTwo after 20 seconds
+      _androidDynamicIconPlugin.scheduleIconChangeWithExactAlarm(
+        seconds: 20,
+        targetIcon: 'IconTwo'
       );
       
       // Планируем периодическую проверку каждые 15 минут
@@ -147,6 +188,63 @@ class _MyAppState extends State<MyApp> {
               },
               child: const Center(
                 child: Text('Change to default (immediate)'),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('New Foreground Service & Exact Alarms Features:',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+            TextButton(
+              onPressed: () async {
+                // Schedule icon change with exact alarm (IconOne in 10 seconds)
+                await _androidDynamicIconPlugin
+                    .scheduleIconChangeWithExactAlarm(
+                      seconds: 10,
+                      targetIcon: 'IconOne');
+              },
+              child: const Center(
+                child: Text('Schedule IconOne (Exact Alarm, 10s)'),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Schedule icon change with exact alarm (IconTwo in 15 seconds)
+                await _androidDynamicIconPlugin
+                    .scheduleIconChangeWithExactAlarm(
+                      seconds: 15,
+                      targetIcon: 'IconTwo');
+              },
+              child: const Center(
+                child: Text('Schedule IconTwo (Exact Alarm, 15s)'),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Start the icon change service
+                await _androidDynamicIconPlugin
+                    .startIconChangeService(targetIcon: 'IconOne');
+              },
+              child: const Center(
+                child: Text('Start Icon Change Service'),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Stop the icon change service
+                await _androidDynamicIconPlugin
+                    .stopIconChangeService();
+              },
+              child: const Center(
+                child: Text('Stop Icon Change Service'),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Cancel scheduled icon change
+                await _androidDynamicIconPlugin
+                    .cancelScheduledIconChange(targetIcon: 'IconOne');
+              },
+              child: const Center(
+                child: Text('Cancel Scheduled IconOne Change'),
               ),
             ),
           ],

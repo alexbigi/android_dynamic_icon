@@ -99,7 +99,7 @@ class DeferredIconChangeManager(private val application: Application) {
         Log.d(TAG, "Scheduled periodic check every $intervalSeconds seconds for icon $targetIconAlias")
     }
 
-    /**
+    /** 
      * Отменить запланированную смену иконки
      */
     fun cancelPendingIconChange() {
@@ -109,7 +109,21 @@ class DeferredIconChangeManager(private val application: Application) {
         Log.d(TAG, "Cancelled pending icon change")
     }
     
-    /**
+    /** 
+     * Отменить запланированную смену иконки по имени
+     */
+    fun cancelScheduledIconChange(targetIcon: String) {
+        if (pendingIconChange == targetIcon) {
+            pendingIconChange = null
+            iconChangeScheduled = false
+            handler.removeCallbacksAndMessages(null)
+            Log.d(TAG, "Cancelled scheduled icon change for $targetIcon")
+        } else {
+            Log.d(TAG, "No scheduled icon change for $targetIcon to cancel")
+        }
+    }
+    
+    /** 
      * Отменить периодическую проверку
      */
     fun cancelPeriodicCheck() {
