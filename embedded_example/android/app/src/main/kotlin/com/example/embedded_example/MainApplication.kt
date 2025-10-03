@@ -54,6 +54,10 @@ class MainApplication : Application() {
                 // Приложение ушло в фоновый режим
                 deferredIconChangeManager?.onAppBackgrounded()
                 Log.d(TAG, "App moved to background")
+                
+                // Проверить, есть ли запланированные изменения иконки от системных компонентов
+                // и выполнить их, если они есть
+                deferredIconChangeManager?.executePendingIconChangeIfAny()
             }
         }
         

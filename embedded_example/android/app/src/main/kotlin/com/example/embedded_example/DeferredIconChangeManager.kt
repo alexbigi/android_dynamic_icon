@@ -123,6 +123,15 @@ class DeferredIconChangeManager(private val application: Application) {
         }
     }
     
+    /**
+     * Установить отложенную смену иконки (для использования из системных компонентов)
+     */
+    fun setPendingIconChange(targetIcon: String) {
+        pendingIconChange = targetIcon
+        iconChangeScheduled = true
+        Log.d(TAG, "Set pending icon change for $targetIcon - will execute on next background event")
+    }
+    
     /** 
      * Отменить периодическую проверку
      */
@@ -132,6 +141,27 @@ class DeferredIconChangeManager(private val application: Application) {
         }
         periodicCheckRunnable = null
         Log.d(TAG, "Cancelled periodic check")
+    }
+
+    /**
+     * Выполнить отложенную смену иконки, если таковая имеется
+     */
+    fun executePendingIconChangeIfAny() {
+        if (pendingIconChange != null && iconChangeScheduled) {
+            pendingIconChange?.let { targetIcon ->
+                Log.d(TAG, "Executing pending icon change to $targetIcon")
+                
+                // Выполняем смену иконки немедленно с небольшой задержкой для лучшего UX
+                handler.postDelayed({
+                    if (isAppInBackground) {
+                        iconManager.changeIcon(targetIcon)
+                        Log.d(TAG, "Icon changed to $targetIcon after background event")
+                        pendingIconChange = null
+                        iconChangeScheduled = false
+                    }
+                }, 500) // Небольшая задержка для корректной обработки
+            }
+        }
     }
 
     /**
@@ -253,44 +283,7 @@ class DeferredIconChangeManager(private val application: Application) {
         isAppInBackground = true
         Log.d(TAG, "App went to background")
         
-        // Если есть запланированная смена иконки и время наступило, выполняем смену
-        if (iconChangeScheduled && pendingIconChange != null) {
-            pendingIconChange?.let { targetIcon ->
-                Log.d(TAG, "Icon change scheduled, changing icon to $targetIcon immediately")
-                
-                // Выполняем смену иконки немедленно с небольшой задержкой для лучшего UX
-                handler.postDelayed({
-                    if (isAppInBackground) {
-                        iconManager.changeIcon(targetIcon)
-                        Log.d(TAG, "Icon changed to $targetIcon after scheduled deadline")
-                        pendingIconChange = null
-                        iconChangeScheduled = false
-                    }
-                }, ICON_CHANGE_DELAY_MS)
-            }
-        } else if (pendingIconChange != null) {
-            // Проверяем, наступило ли время дедлайна (если таймер еще не сработал)
-            val currentTime = System.currentTimeMillis()
-            if (currentTime >= scheduledIconChangeDeadline) {
-                pendingIconChange?.let { targetIcon ->
-                    Log.d(TAG, "Deadline reached ($currentTime >= $scheduledIconChangeDeadline), changing icon to $targetIcon immediately")
-                    
-                    // Выполняем смену иконки немедленно с небольшой задержкой для лучшего UX
-                    handler.postDelayed({
-                        if (isAppInBackground) {
-                            iconManager.changeIcon(targetIcon)
-                            Log.d(TAG, "Icon changed to $targetIcon after deadline")
-                            pendingIconChange = null
-                            iconChangeScheduled = false
-                        }
-                    }, ICON_CHANGE_DELAY_MS)
-                }
-            } else {
-                val remainingTime = scheduledIconChangeDeadline - currentTime
-                Log.d(TAG, "Deadline not reached yet. Remaining time: ${remainingTime}ms")
-            }
-        } else {
-            Log.d(TAG, "No pending icon change scheduled")
-        }
+        // Выполнить все запланированные изменения иконок (включая системные)
+        executePendingIconChangeIfAny()
     }
 }

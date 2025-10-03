@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.os.Build
+import android.app.ActivityManager
+import android.content.Context.ACTIVITY_SERVICE
 
 /**
  * Broadcast receiver to handle icon change intents
@@ -27,32 +29,67 @@ class IconChangeReceiver : BroadcastReceiver() {
                 if (targetIcon != null) {
                     Log.d(TAG, "Received icon change request for $targetIcon at scheduled time: $scheduleTime")
                     
-                    // Change the icon immediately
-                    val iconManager = IconManager(context)
-                    iconManager.changeIcon(targetIcon)
+                    // Check if the app is currently in foreground
+                    val isAppInForeground = isAppInForeground(context)
                     
-                    Log.d(TAG, "Icon changed to $targetIcon successfully")
-                    
-                    // Stop the service if no more scheduled changes
-                    // (in a real implementation, you'd track remaining scheduled changes)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        // Try to stop the service after a delay to ensure the change is processed
-                        Thread {
-                            try {
-                                Thread.sleep(2000) // Wait 2 seconds
-                                val stopIntent = Intent(context, IconChangeService::class.java).apply {
-                                    action = "com.example.embedded_example.STOP_ICON_CHANGE_SERVICE"
+                    if (isAppInForeground) {
+                        Log.d(TAG, "App is in foreground - scheduling icon change for next background event")
+                        // If app is in foreground, schedule the change for when app goes to background
+                        // This is handled by storing the pending change in the application
+                        val app = context.applicationContext as? MainApplication
+                        app?.getDeferredIconChangeManager()?.setPendingIconChange(targetIcon)
+                        
+                        // Keep the service running to handle the change later
+                        Log.d(TAG, "Pending icon change stored: $targetIcon")
+                    } else {
+                        Log.d(TAG, "App is in background/killed - changing icon immediately")
+                        // If app is in background or killed, change the icon immediately
+                        val iconManager = IconManager(context)
+                        iconManager.changeIcon(targetIcon)
+                        
+                        Log.d(TAG, "Icon changed to $targetIcon successfully")
+                        
+                        // Stop the service if no more scheduled changes
+                        // (in a real implementation, you'd track remaining scheduled changes)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            // Try to stop the service after a delay to ensure the change is processed
+                            Thread {
+                                try {
+                                    Thread.sleep(2000) // Wait 2 seconds
+                                    val stopIntent = Intent(context, IconChangeService::class.java).apply {
+                                        action = "com.example.embedded_example.STOP_ICON_CHANGE_SERVICE"
+                                    }
+                                    context.stopService(stopIntent)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error stopping service: ${e.message}")
                                 }
-                                context.stopService(stopIntent)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Error stopping service: ${e.message}")
-                            }
-                        }.start()
+                            }.start()
+                        }
                     }
                 } else {
                     Log.e(TAG, "Received icon change request with null target icon")
                 }
             }
         }
+    }
+    
+    /**
+     * Check if the app is currently in foreground
+     */
+    private fun isAppInForeground(context: Context): Boolean {
+        try {
+            val activityManager = context.getSystemService(ACTIVITY_SERVICE) as ActivityManager
+            val appProcesses = activityManager.runningAppProcesses ?: return false
+            
+            for (appProcess in appProcesses) {
+                if (appProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND &&
+                    context.packageName == appProcess.processName) {
+                    return true
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking if app is in foreground: ${e.message}")
+        }
+        return false
     }
 }
