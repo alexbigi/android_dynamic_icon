@@ -160,7 +160,7 @@ class IconChangeService : Service() {
         val app = applicationContext as? MainApplication
         app?.getConfigManager()?.saveConfig(config)
         
-        Log.d(TAG, "Started autonomous operation with ${config.holidays.size} holidays, default: ${config.defaultIcon}")
+        Log.d(TAG, "Started autonomous operation with ${config.holidays.size} holidays, default: ${config.defaultIcon}, check interval: ${config.checkIntervalSeconds}s")
         
         // Начинаем проверку дат немедленно
         checkAndChangeIconByDate()
@@ -245,59 +245,15 @@ class IconChangeService : Service() {
     }
     
     /**
-     * Schedule the next date check
+     * Schedule the next date check (using interval-based approach for better reliability)
      */
     private fun scheduleNextDateCheck() {
         val config = currentConfig ?: return
-        val configJson = serializeConfig(config)  // используем текущую конфигурацию
         
         try {
-            val calendar = Calendar.getInstance().apply {
-                timeInMillis = System.currentTimeMillis()
-                add(Calendar.DAY_OF_MONTH, 1) // следующий день
-                set(Calendar.HOUR_OF_DAY, 0)   // полночь
-                set(Calendar.MINUTE, 0)        // начало часа
-                set(Calendar.SECOND, 0)        // начало минуты
-                set(Calendar.MILLISECOND, 0)   // начало секунды
-            }
-            
-            val intent = Intent(this, DateCheckReceiver::class.java).apply {
-                action = DateCheckReceiver.getActionName(this@IconChangeService)
-                putExtra(DateCheckReceiver.EXTRA_CONFIG_JSON, configJson)
-            }
-            
-            val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                android.app.PendingIntent.getBroadcast(
-                    this,
-                    0,
-                    intent,
-                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-                )
-            } else {
-                android.app.PendingIntent.getBroadcast(
-                    this,
-                    0,
-                    intent,
-                    android.app.PendingIntent.FLAG_UPDATE_CURRENT
-                )
-            }
-            
-            // Планируем точный будильник
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    android.app.AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    android.app.AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
-            
-            Log.d(TAG, "Scheduled next date check at: ${calendar.time}")
+            // Используем интервальный receiver для регулярной проверки
+            val receiver = DateCheckIntervalReceiver()
+            receiver.scheduleNextIntervalCheck(this, config.checkIntervalSeconds)
         } catch (e: Exception) {
             Log.e(TAG, "Error scheduling next date check: ${e.message}", e)
         }
